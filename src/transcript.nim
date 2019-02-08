@@ -56,7 +56,7 @@ proc scriptWriteData(s: Stream; buffer: pointer; bufLen: int) =
   discard t.script.popFirst
   let neww = w.substr(temp.len)
   if neww != "":
-    t.script.addFirst((r, w))
+    t.script.addFirst((r, neww))
 
 # proc scriptClose(s: Stream) =
 #   let t = TranscriptStream(s)

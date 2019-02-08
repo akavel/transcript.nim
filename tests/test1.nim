@@ -4,8 +4,7 @@ import strutils
 import streams
 import transcript
 
-test "simple session, arrow-style, with comments":
-  let session = transcript"""
+const script = """
 # simple comment -> foobar 00 01 02 03
 <-
 2f 6e 69 78 2f 73 74 6f 72 65 2f 67 32 79 6b 35   # /nix/store/g2yk5 |
@@ -21,6 +20,9 @@ cb ee 52 54 00 00 00 00 04 02 00 00 00 00 00 00   # ..RT............ |
 <- # 0s  16 bytes
 eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00   # ...9............ |
 """
+
+test "simple session, arrow-style, with comments":
+  let session = transcript(script)
   check session.readAll().toHex == strip_space"""
 2f 6e 69 78 2f 73 74 6f 72 65 2f 67 32 79 6b 35
 34 68 69 66 71 6c 73 6a 69 68 61 33 73 7a 72 34
@@ -32,7 +34,14 @@ cb ee 52 54 00 00 00 00 04 02 00 00 00 00 00 00""".parseHexStr)
 eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00"""
 
 test "partial read & write":
-  skip
+  let session = transcript(script)
+  check session.readStr(4) == "/nix"
+  check session.readAll() == "/store/g2yk54hifqlsjiha3szr4q3ccmdzyrdv-glibc-2.27\x00\x00"
+  session.write("cb ee 52 54".strip_space.parseHexStr)
+  session.write("00 00 00 00 04 02 00 00 00 00 00 00".strip_space.parseHexStr)
+  check session.readAll().toHex == strip_space"""
+eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00"""
+
 test "exception on bad byte write":
   skip
 test "exception on write instead of read":
