@@ -42,15 +42,15 @@ proc scriptReadData(s: Stream; buffer: pointer; bufLen: int): int =
   t.script.addFirst((r.substr(result), w))
 
 proc scriptWriteData(s: Stream; buffer: pointer; bufLen: int) =
-  let t = TranscriptStream(s)
-  if t.script.len == 0:
-    raise newException(TranscriptError, "transcript contains EOF, but a write was attempted")
-  let (r, w) = t.script.peekFirst
-  if r != "":
-    raise newException(TranscriptError, "transcript contains Read, but a write was attempted")
-  # Compare buffer with bytes from 'w'
   var temp = newString(bufLen)
   copyMem(temp[0].addr, buffer, bufLen)
+  let t = TranscriptStream(s)
+  if t.script.len == 0:
+    raise newException(TranscriptError, "transcript contains EOF, but a write 0x$# was attempted" % [toHex(temp)])
+  let (r, w) = t.script.peekFirst
+  if r != "":
+    raise newException(TranscriptError, "transcript contains Read, but a write 0x$# was attempted" % [toHex(temp)])
+  # Compare buffer with bytes from 'w'
   if not w.startsWith(temp):
     raise newException(TranscriptError, "transcript contains Write 0x$#, but a write 0x$# was attempted" % [toHex(w), toHex(temp)])
   discard t.script.popFirst

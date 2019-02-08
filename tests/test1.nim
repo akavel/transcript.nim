@@ -43,9 +43,17 @@ test "partial read & write":
 eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00"""
 
 test "exception on bad byte write":
-  skip
+  let session = transcript(script)
+  discard session.readAll()
+  session.write("cb ee 52 54".strip_space.parseHexStr)
+  expect TranscriptError:
+    session.write("00 01".strip_space.parseHexStr)
+
 test "exception on write instead of read":
-  skip
+  let session = transcript(script)
+  expect TranscriptError:
+    session.write("cb ee 52 54".strip_space.parseHexStr)
+
 test "read EOFs when ended":
   skip
 
