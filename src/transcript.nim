@@ -39,13 +39,18 @@ proc scriptReadData(s: Stream; buffer: pointer; bufLen: int): int =
   if t.script.len == 0 or bufLen == 0:
     return 0
   var (r, w) = t.script.peekFirst
+  if r == "" and w == "":
+    discard t.script.popFirst()
+    return t.readData(buffer, bufLen)
   if r == "":
     return 0
   # Copy bytes from 'r'
   result = min(r.len, bufLen)
   copyMem(buffer, r[0].addr, result)
   discard t.script.popFirst
-  t.script.addFirst((r.substr(result), w))
+  let newr = r.substr(result)
+  if newr != "" and w != "":
+    t.script.addFirst((r.substr(result), w))
 
 proc scriptWriteData(s: Stream; buffer: pointer; bufLen: int) =
   var temp = newString(bufLen)
@@ -54,14 +59,12 @@ proc scriptWriteData(s: Stream; buffer: pointer; bufLen: int) =
   if t.script.len == 0:
     raise newException(TranscriptError, "transcript contains EOF, but a write 0x$# was attempted" % [toHex(temp)])
   let (r, w) = t.script.peekFirst
-  if r != "":
-    raise newException(TranscriptError, "transcript contains Read, but a write 0x$# was attempted" % [toHex(temp)])
   # Compare buffer with bytes from 'w'
   if not w.startsWith(temp):
     raise newException(TranscriptError, "transcript contains Write 0x$#, but a write 0x$# was attempted" % [toHex(w), toHex(temp)])
   discard t.script.popFirst
   let neww = w.substr(temp.len)
-  if neww != "":
+  if r != "" or neww != "":
     t.script.addFirst((r, neww))
 
 proc parse(s: Stream, d: var Deque[(string, string)]) =

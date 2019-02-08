@@ -51,13 +51,22 @@ test "exception on bad byte write":
   expect TranscriptError:
     session.write("00 01".strip_space.parseHexStr)
 
-test "exception on write instead of read":
-  let session = transcript(script)
-  expect TranscriptError:
-    session.write("cb ee 52 54".strip_space.parseHexStr)
-
 test "read EOFs when ended":
   skip
+
+test "allow read+write+write+read, when only read+write in transcript":
+  # This happened in a `nix copy` transcript.
+  let session = transcript"""
+-> # 0s  16 bytes
+eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00   # ...9............ |
+
+<- # 0s  16 bytes
+cb ee 52 54 00 00 00 00 04 02 00 00 00 00 00 00   # ..RT............ |
+"""
+  check session.readStr(8).toHex == strip_space"eb 9d 0c 39 00 00 00 00"
+  session.write("cb ee 52 54 00 00 00 00".strip_space.parseHexStr)
+  session.write("04 02 00 00 00 00 00 00".strip_space.parseHexStr)
+  check session.readAll().toHex == strip_space"04 02 00 00 00 00 00 00"
 
 proc strip_space(s: string): string =
   return s.multiReplace(("\n", ""), (" ", "")).toUpper
