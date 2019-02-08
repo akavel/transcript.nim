@@ -14,11 +14,11 @@ test "simple session, arrow-style, with comments":
 63 2d 32 2e 32 37 00 00                           # c-2.27..         |
 
 # 1463  write(1, "\313\356RT\0\0\0\0\4\2\0\0\0\0\0\0", 16) = 16
-<- # 0s  16 bytes
+-> # 0s  16 bytes
 cb ee 52 54 00 00 00 00 04 02 00 00 00 00 00 00   # ..RT............ |
 
 # 1463  read(0, "\353\235\f9\0\0\0\0\4\2\0\0\0\0\0\0", 8192) = 16
--> # 0s  16 bytes
+<- # 0s  16 bytes
 eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00   # ...9............ |
 """
   check session.readAll().toHex == strip_space"""
