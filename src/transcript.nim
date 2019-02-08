@@ -6,8 +6,6 @@ import deques
 type
   TranscriptStream* = ref object of Stream
     script: Deque[(string, string)]  # (read, write)
-    unfetchB: char
-    unfetchDir: Direction
   TranscriptError* = object of CatchableError
   # TODO(akavel): use variant type instead of (Direction, char) pair - here and in `unfetch`
   Direction = enum
@@ -22,11 +20,19 @@ proc transcript*(script: Stream): TranscriptStream =
   result = new(TranscriptStream)
   result.script = initDeque[(string, string)]()
   parse(script, result.script)
-  result.unfetchDir = EOF
-  # result.closeImpl = scriptClose
+  result.atEndImpl = scriptAtEnd
   result.readDataImpl = scriptReadData
   result.writeDataImpl = scriptWriteData
   result.flushImpl = proc(s: Stream) = discard
+
+proc scriptAtEnd(s: Stream): bool =
+  let t = TranscriptStream(s)
+  if t.script.len == 0:
+    return true
+  let (r, w) = t.script.peekFirst
+  if r == "" and w == "":
+    return true
+  return false
 
 proc scriptReadData(s: Stream; buffer: pointer; bufLen: int): int =
   let t = TranscriptStream(s)
@@ -57,12 +63,6 @@ proc scriptWriteData(s: Stream; buffer: pointer; bufLen: int) =
   let neww = w.substr(temp.len)
   if neww != "":
     t.script.addFirst((r, neww))
-
-# proc scriptClose(s: Stream) =
-#   let t = TranscriptStream(s)
-#   let (dir, b) = t.fetchByte()
-#   if dir != EOF:
-#     raise newException(Exception, "transcript has $# of 0x$#, but a close was attempted" % [$dir, toHex($b)])
 
 proc parse(s: Stream, d: var Deque[(string, string)]) =
   var

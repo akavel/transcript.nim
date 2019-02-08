@@ -35,12 +35,14 @@ eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00"""
 
 test "partial read & write":
   let session = transcript(script)
+  check session.atEnd.not
   check session.readStr(4) == "/nix"
   check session.readAll() == "/store/g2yk54hifqlsjiha3szr4q3ccmdzyrdv-glibc-2.27\x00\x00"
   session.write("cb ee 52 54".strip_space.parseHexStr)
   session.write("00 00 00 00 04 02 00 00 00 00 00 00".strip_space.parseHexStr)
   check session.readAll().toHex == strip_space"""
 eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00"""
+  check session.atEnd
 
 test "exception on bad byte write":
   let session = transcript(script)
