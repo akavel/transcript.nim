@@ -1,5 +1,7 @@
 {.experimental: "codeReordering".}
 import unittest
+import strutils
+import streams
 import transcript
 
 test "simple session, arrow-style, with comments":
@@ -25,7 +27,7 @@ eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00   # ...9............ |
 71 33 63 63 6d 64 7a 79 72 64 76 2d 67 6c 69 62
 63 2d 32 2e 32 37 00 00"""
   session.write(strip_space"""
-cb ee 52 54 00 00 00 00 04 02 00 00 00 00 00 00""".parseHex)
+cb ee 52 54 00 00 00 00 04 02 00 00 00 00 00 00""".parseHexStr)
   check session.readAll().toHex == strip_space"""
 eb 9d 0c 39 00 00 00 00 04 02 00 00 00 00 00 00"""
 
@@ -39,4 +41,4 @@ test "read EOFs when ended":
   skip
 
 proc strip_space(s: string): string =
-  return s.multiReplace(("\n", ""), (" ", ""))
+  return s.multiReplace(("\n", ""), (" ", "")).toUpper
