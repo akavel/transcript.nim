@@ -94,7 +94,7 @@ proc parse(s: Stream, d: var Deque[(string, string)]) =
       if buf == "" and b in {'<', '-'}:
         buf.add(b)
         continue
-      elif buf == "<" and b == '-':
+      elif buf == "-" and b == '>':
         buf = ""
         # Switch direction to Read
         case dir
@@ -106,7 +106,7 @@ proc parse(s: Stream, d: var Deque[(string, string)]) =
             write = ""
         dir = Read
         continue
-      elif buf == "-" and b == '>':
+      elif buf == "<" and b == '-':
         buf = ""
         # Switch direction to Write
         dir = Write
