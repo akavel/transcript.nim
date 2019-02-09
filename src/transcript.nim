@@ -5,72 +5,67 @@ import deques
 
 type
   TranscriptStream* = ref object of Stream
-    script: Deque[(string, string)]  # (read, write)
+    reads: string
+    writes: string
+    rPos, wPos: int
+    barriers: Barriers
   TranscriptError* = object of CatchableError
-  # TODO(akavel): use variant type instead of (Direction, char) pair - here and in `unfetch`
+
+  Barriers = Deque[tuple[w: int, r: int]]
   Direction = enum
     EOF
     Read
     Write
+  # Substring = distinct string
 
 proc transcript*(script: string): TranscriptStream =
   return transcript(newStringStream(script))
 
 proc transcript*(script: Stream): TranscriptStream =
   result = new(TranscriptStream)
-  result.script = initDeque[(string, string)]()
-  parse(script, result.script)
+  result.barriers = initDeque[(int, int)]()
+  parse(script, result.reads, result.writes, result.barriers)
   result.atEndImpl = scriptAtEnd
   result.readDataImpl = scriptReadData
   result.writeDataImpl = scriptWriteData
   result.flushImpl = proc(s: Stream) = discard
 
+proc endPos(t: TranscriptStream): int =
+  while t.barriers.len > 0 and t.wPos >= t.barriers.peekFirst.w:
+    t.barriers.popFirst()
+  if t.barriers.len > 0:
+    return t.barriers.peekFirst.r
+  else:
+    return t.reads.len
+
 proc scriptAtEnd(s: Stream): bool =
   let t = TranscriptStream(s)
-  if t.script.len == 0:
-    return true
-  let (r, w) = t.script.peekFirst
-  if r == "" and w == "":
-    return true
-  return false
+  return t.rPos >= t.endPos
 
 proc scriptReadData(s: Stream; buffer: pointer; bufLen: int): int =
   let t = TranscriptStream(s)
-  if t.script.len == 0 or bufLen == 0:
+  if t.atEnd or bufLen == 0:
     return 0
-  var (r, w) = t.script.peekFirst
-  if r == "" and w == "":
-    discard t.script.popFirst()
-    return t.readData(buffer, bufLen)
-  if r == "":
-    return 0
-  # Copy bytes from 'r'
-  result = min(r.len, bufLen)
-  copyMem(buffer, r[0].addr, result)
-  discard t.script.popFirst
-  let newr = r.substr(result)
-  if newr != "" and w != "":
-    t.script.addFirst((r.substr(result), w))
+  result = min(t.endPos - t.rPos, bufLen)
+  copyMem(buffer, t.reads[t.rPos].addr, result)
+  t.rPos += result
 
 proc scriptWriteData(s: Stream; buffer: pointer; bufLen: int) =
   var temp = newString(bufLen)
   copyMem(temp[0].addr, buffer, bufLen)
   let t = TranscriptStream(s)
-  if t.script.len == 0:
+  if t.wPos >= t.writes.len:
     raise newException(TranscriptError, "transcript contains EOF, but a write 0x$# was attempted" % [toHex(temp)])
-  let (r, w) = t.script.peekFirst
+  if bufLen == 0:
+    return
   # Compare buffer with bytes from 'w'
-  if not w.startsWith(temp):
-    raise newException(TranscriptError, "transcript contains Write 0x$#, but a write 0x$# was attempted" % [toHex(w), toHex(temp)])
-  discard t.script.popFirst
-  let neww = w.substr(temp.len)
-  if r != "" or neww != "":
-    t.script.addFirst((r, neww))
+  let master = t.writes.substr(t.wPos, t.wPos+temp.len-1)
+  if master != temp:
+    raise newException(TranscriptError, "transcript contains Write 0x$#, but a write 0x$# was attempted" % [toHex(master), toHex(temp)])
+  t.wPos += temp.len
 
-proc parse(s: Stream, d: var Deque[(string, string)]) =
+proc parse(s: Stream, reads: var string, writes: var string, barriers: var Barriers) =
   var
-    read = ""
-    write = ""
     buf = ""
     dir = EOF
   while true:
@@ -83,8 +78,8 @@ proc parse(s: Stream, d: var Deque[(string, string)]) =
         # Add a hex digit to current script
         let ch = chr(buf[0].nibble * 0x10 + b.nibble)
         case dir
-        of Read:  read.add(ch)
-        of Write: write.add(ch)
+        of Read:  reads.add(ch)
+        of Write: writes.add(ch)
         of EOF:   raise newException(CatchableError, "no initial direction specified in transcript")
         buf = ""
       else:
@@ -99,19 +94,13 @@ proc parse(s: Stream, d: var Deque[(string, string)]) =
         continue
       elif buf == "-" and b == '>':
         buf = ""
-        # Switch direction to Read
-        case dir
-        of Read, EOF: discard
-        of Write:
-          if write != "":
-            d.addLast((read, write))
-            read = ""
-            write = ""
+        if dir == Write:
+          # Until this write position is passed, only so many bytes can be read from transcript
+          barriers.addLast((w: writes.len, r: reads.len))
         dir = Read
         continue
       elif buf == "<" and b == '-':
         buf = ""
-        # Switch direction to Write
         dir = Write
         continue
       elif buf.len == 1:
@@ -121,8 +110,6 @@ proc parse(s: Stream, d: var Deque[(string, string)]) =
     of '\0':  # EOF
       if buf.len == 1:
         raise newException(CatchableError, "unexpected '$#' character in transcript" % $buf[0])
-      if read != "" or write != "":
-        d.addLast((read, write))
       return
     else:
       raise newException(CatchableError, "unexpected '$#' character in transcript" % $b)
